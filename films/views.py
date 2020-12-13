@@ -1,0 +1,95 @@
+from django.views.generic.base import View 
+from django.views.generic import ListView , DetailView
+from .models import *
+from django.shortcuts import render , redirect
+from .forms import ReviewForm
+from django.db.models import Q
+
+
+# class MoviesView(View):
+#     def get (self ,request):
+#         movies = Movie.objects.all()
+#         return render(request , 'movies.html' , {'movies_list': movies})
+
+
+class GenreYear:
+
+    def get_genres(self):
+        return Genre.objects.all()
+
+    def get_years(self):
+        return Movie.objects.filter(draft=False).values('year')
+
+
+class MoviesView(GenreYear ,ListView):
+    
+    model = Movie
+    queryset = Movie.objects.filter(draft=False)
+    template_name= 'movies.html'
+
+    def get_context_data(self,*args , **kwargs):
+        context = super().get_context_data(*args , **kwargs)
+        context["categories"] = Category.objects.all()
+        context['movies'] = Movie.objects.order_by("id")[:3]
+        return context
+  
+
+    
+   
+
+
+# class MovieDetailView(View):
+#     def get(self, request , pk):
+#         movie = Movie.objects.get(id=pk)
+#         return render(request , 'moviedetail.html' , {'movie': movie})
+
+
+class MovieDetailView(GenreYear ,DetailView):
+    model = Movie
+    slug_field = 'url'
+    template_name= 'moviedetail.html'
+
+    def get_context_data(self,*args , **kwargs):
+        context = super().get_context_data(*args , **kwargs)
+        context["categories"] = Category.objects.all()
+        context['movies'] = Movie.objects.order_by("-id")[:3]
+        return context
+
+
+class AddReview(View):
+    def post(self , request , pk):
+        form = ReviewForm(request.POST)
+        movie = Movie.objects.get(id=pk)
+        if form.is_valid():
+            form =form.save(commit=False)
+            if request.POST.get('parent' , None):
+                form.parent_id = int(request.POST.get('parent'))
+            form.movie = movie
+            form.save()
+        return redirect(movie.get_absolute_url())
+
+
+class ActorView(GenreYear ,DetailView):
+    model = Actor
+    template_name='actors.html'
+    slug_field='name'
+
+
+class FilterMoviesView(GenreYear ,ListView):
+    template_name ='movies.html'
+    def get_queryset(self):
+        queryset = Movie.objects.filter(
+            Q(year__in=self.request.GET.getlist("year")) |
+            Q(genres__in=self.request.GET.getlist("genre"))
+        )
+        return queryset
+    
+    def get_context_data(self,*args , **kwargs):
+        context = super().get_context_data(*args , **kwargs)
+        context["categories"] = Category.objects.all()
+        context['movies'] = Movie.objects.order_by("-id")[:3]
+        return context
+
+
+    
+
